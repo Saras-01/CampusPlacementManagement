@@ -18,6 +18,7 @@ namespace CampusPlacementManagement.Interfaces
         Task<bool> ApproveAsync(int id, string approvedBy);
 
         Task<bool> RejectAsync(int id);
+        Task<bool> SuspendAsync(int id);
 
         Task<bool> UpdateAsync(int id, PlacementOfficerUpdateDto dto);
     }

@@ -80,6 +80,8 @@ builder.Services.AddScoped<ICollegeService, CollegeService>();
 builder.Services.AddScoped<
     IPlacementOfficerService, PlacementOfficerService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ICompanyRepository, CompanyRepository>();
+builder.Services.AddScoped<ICompanyService, CompanyService>();
 
 // 7. Add OpenAPI
 builder.Services.AddOpenApi();

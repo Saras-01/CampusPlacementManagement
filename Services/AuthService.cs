@@ -1,13 +1,12 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-
-using CampusPlacementManagement.DTOs.Auth;
+﻿using CampusPlacementManagement.DTOs.Auth;
+using CampusPlacementManagement.Enums;
 using CampusPlacementManagement.Interfaces;
 using CampusPlacementManagement.Models;
-
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace CampusPlacementManagement.Services
 {
@@ -15,13 +14,19 @@ namespace CampusPlacementManagement.Services
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IConfiguration _configuration;
+        private readonly IPlacementOfficerRepository _placementOfficerRepository;
+        private readonly ICollegeRepository _collegeRepository;
 
         public AuthService(
-            UserManager<ApplicationUser> userManager,
-            IConfiguration configuration)
+    UserManager<ApplicationUser> userManager,
+    IConfiguration configuration,
+    IPlacementOfficerRepository placementOfficerRepository,
+    ICollegeRepository collegeRepository)
         {
             _userManager = userManager;
             _configuration = configuration;
+            _placementOfficerRepository = placementOfficerRepository;
+            _collegeRepository = collegeRepository;
         }
 
         public async Task<AuthResponseDto?> LoginAsync(LoginDto loginDto)
@@ -38,6 +43,23 @@ namespace CampusPlacementManagement.Services
                 return null;
 
             var roles = await _userManager.GetRolesAsync(user);
+            // Check Placement Officer approval status
+            var placementOfficer =
+                await _placementOfficerRepository.GetByUserIdAsync(user.Id);
+
+            if (placementOfficer != null)
+            {
+                if (placementOfficer.Status != AccountStatus.Approved)
+                {
+                    return null;
+                }
+
+                if (placementOfficer.College == null ||
+                    placementOfficer.College.Status != CollegeStatus.Approved)
+                {
+                    return null;
+                }
+            }
 
             var claims = new List<Claim>
             {

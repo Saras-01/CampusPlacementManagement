@@ -52,14 +52,40 @@ namespace CampusPlacementManagement.Controllers
         }
 
         // 3. Get Placement Officer by ID
-        [Authorize(Roles = UserRoles.SuperAdmin)]
+        [Authorize(Roles = UserRoles.SuperAdmin + "," + UserRoles.PlacementOfficer)]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
             var result = await _service.GetByIdAsync(id);
 
             if (result == null)
-                return NotFound(new { message = "Placement Officer not found." });
+            {
+                return NotFound(new
+                {
+                    message = "Placement Officer not found."
+                });
+            }
+
+            // SuperAdmin can view any officer.
+            if (User.IsInRole(UserRoles.SuperAdmin))
+            {
+                return Ok(result);
+            }
+
+            // Get logged-in user's ID from JWT.
+            var loggedInUserId = User.FindFirstValue(
+                ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrEmpty(loggedInUserId))
+            {
+                return Unauthorized();
+            }
+
+            // Placement Officer can view only their own profile.
+            if (result.UserId != loggedInUserId)
+            {
+                return Forbid();
+            }
 
             return Ok(result);
         }
@@ -131,6 +157,36 @@ namespace CampusPlacementManagement.Controllers
             catch (InvalidOperationException ex)
             {
                 return BadRequest(new { message = ex.Message });
+            }
+        }
+        // Suspend Placement Officer
+        [Authorize(Roles = UserRoles.SuperAdmin)]
+        [HttpPut("{id}/suspend")]
+        public async Task<IActionResult> Suspend(int id)
+        {
+            try
+            {
+                var result = await _service.SuspendAsync(id);
+
+                if (!result)
+                {
+                    return NotFound(new
+                    {
+                        message = "Placement Officer not found."
+                    });
+                }
+
+                return Ok(new
+                {
+                    message = "Placement Officer suspended successfully."
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
             }
         }
 

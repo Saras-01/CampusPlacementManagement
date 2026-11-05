@@ -26,8 +26,9 @@ namespace CampusPlacementManagement.Services
 
         // Register Placement Officer
         public async Task<PlacementOfficerResponseDto> RegisterAsync(
-            PlacementOfficerRegisterDto dto)
+    PlacementOfficerRegisterDto dto)
         {
+            // 1. Check whether college exists
             var college = await _collegeRepository.GetByIdAsync(dto.CollegeId);
 
             if (college == null)
@@ -37,31 +38,57 @@ namespace CampusPlacementManagement.Services
                 throw new InvalidOperationException(
                     "Only approved colleges can register Placement Officers.");
 
+            // 2. Check whether an officer profile already exists
             var existingUser = await _userManager.FindByEmailAsync(dto.Email);
 
+            ApplicationUser user;
+            bool isNewUser = false;
+
             if (existingUser != null)
-                throw new InvalidOperationException(
-                    "An account with this email already exists.");
-
-            var user = new ApplicationUser
             {
-                UserName = dto.Email,
-                Email = dto.Email,
-                FullName = dto.FullName
-            };
+                var existingOfficer =
+                    await _repository.GetByUserIdAsync(existingUser.Id);
 
-            var identityResult = await _userManager.CreateAsync(
-                user, dto.Password);
+                if (existingOfficer != null)
+                    throw new InvalidOperationException(
+                        "This user is already registered as a Placement Officer.");
 
-            if (!identityResult.Succeeded)
+                if (await _userManager.IsInRoleAsync(
+                    existingUser, UserRoles.SuperAdmin))
+                {
+                    throw new InvalidOperationException(
+                        "This email belongs to a SuperAdmin account.");
+                }
+
+                // Reuse the existing Identity account
+                user = existingUser;
+            }
+            else
             {
-                var errors = string.Join(
-                    "; ",
-                    identityResult.Errors.Select(e => e.Description));
+                // 3. Create a new Identity account only if none exists
+                user = new ApplicationUser
+                {
+                    UserName = dto.Email,
+                    Email = dto.Email,
+                    FullName = dto.FullName
+                };
 
-                throw new InvalidOperationException(errors);
+                var createUserResult =
+                    await _userManager.CreateAsync(user, dto.Password);
+
+                if (!createUserResult.Succeeded)
+                {
+                    var errors = string.Join(
+                        "; ",
+                        createUserResult.Errors.Select(e => e.Description));
+
+                    throw new InvalidOperationException(errors);
+                }
+
+                isNewUser = true;
             }
 
+            // 4. Create Placement Officer profile
             var officer = new PlacementOfficer
             {
                 UserId = user.Id,
@@ -77,7 +104,12 @@ namespace CampusPlacementManagement.Services
             }
             catch
             {
-                await _userManager.DeleteAsync(user);
+                // Delete only accounts created during this attempt.
+                if (isNewUser)
+                {
+                    await _userManager.DeleteAsync(user);
+                }
+
                 throw;
             }
 
@@ -178,6 +210,26 @@ namespace CampusPlacementManagement.Services
             officer.Status = AccountStatus.Rejected;
 
             _repository.Update(officer);
+            await _repository.SaveChangesAsync();
+
+            return true;
+        }
+        // Suspend Placement Officer
+        public async Task<bool> SuspendAsync(int id)
+        {
+            var officer = await _repository.GetByIdAsync(id);
+
+            if (officer == null)
+                return false;
+
+            if (officer.Status != AccountStatus.Approved)
+                throw new InvalidOperationException(
+                    "Only approved Placement Officers can be suspended.");
+
+            officer.Status = AccountStatus.Suspended;
+
+            _repository.Update(officer);
+
             await _repository.SaveChangesAsync();
 
             return true;
