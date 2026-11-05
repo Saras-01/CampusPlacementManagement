@@ -88,9 +88,12 @@ namespace CampusPlacementManagement.Services
             if (college == null)
                 return false;
 
+            if (college.Status != CollegeStatus.Pending)
+                throw new InvalidOperationException(
+                    "Only pending colleges can be approved.");
+
             college.Status = CollegeStatus.Approved;
 
-            await _collegeRepository.UpdateAsync(college);
             await _collegeRepository.SaveChangesAsync();
 
             return true;
@@ -104,14 +107,16 @@ namespace CampusPlacementManagement.Services
             if (college == null)
                 return false;
 
+            if (college.Status != CollegeStatus.Pending)
+                throw new InvalidOperationException(
+                    "Only pending colleges can be rejected.");
+
             college.Status = CollegeStatus.Rejected;
 
-            await _collegeRepository.UpdateAsync(college);
             await _collegeRepository.SaveChangesAsync();
 
             return true;
         }
-
         // 7. Suspend College
         public async Task<bool> SuspendCollegeAsync(int collegeId)
         {
@@ -120,9 +125,12 @@ namespace CampusPlacementManagement.Services
             if (college == null)
                 return false;
 
+            if (college.Status != CollegeStatus.Approved)
+                throw new InvalidOperationException(
+                    "Only approved colleges can be suspended.");
+
             college.Status = CollegeStatus.Suspended;
 
-            await _collegeRepository.UpdateAsync(college);
             await _collegeRepository.SaveChangesAsync();
 
             return true;
